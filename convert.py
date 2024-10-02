@@ -14,6 +14,10 @@ from pptx import Presentation
 from svglib.svglib import svg2rlg
 from reportlab.graphics import renderPDF
 import pdfkit
+from io import BytesIO
+from PIL import Image as PILImage
+from reportlab.lib.colors import HexColor
+
 
 def download_pdf():
     return os.path.join(os.path.expanduser('~'), 'Downloads')
@@ -43,7 +47,6 @@ def convert_docx_to_pdf(input_path: str, output_path: str) -> None:
             raise
 
 #conversor XLSX
-# Función para obtener anchos de columnas
 def get_column_widths(sheet, max_width):
     column_widths = []
     for col in sheet.columns:
@@ -59,7 +62,6 @@ def get_column_widths(sheet, max_width):
     
     return column_widths
 
-# Función para obtener la altura de las filas y limitarla si es necesario
 def get_row_heights(sheet, max_height=50):
     row_heights = []
     for row in sheet.iter_rows():
@@ -71,7 +73,7 @@ def get_row_heights(sheet, max_height=50):
         row_heights.append(height)
     return row_heights
 
-# Función para procesar celdas y ajustarlas a tamaños razonables
+# Función para procesar celdas y ajustarlas a tamaños de hoja
 def process_cell(cell, centered_style, max_characters=100):
     if cell.data_type == 'i':  # Image
         img = Image(io.BytesIO(cell.value))
@@ -85,7 +87,6 @@ def process_cell(cell, centered_style, max_characters=100):
         return Paragraph(cell_value, centered_style)
     return ''
 
-# Función para convertir XLSX a PDF
 def convert_xlsx_to_pdf(input_path: str, output_path: str) -> None:
     wb = load_workbook(input_path)
     sheet = wb.active
@@ -151,8 +152,10 @@ def convert_xlsx_to_pdf(input_path: str, output_path: str) -> None:
     prs = Presentation(input_path)
     slides_text = "\n\n".join([shape.text for slide in prs.slides for shape in slide.shapes if hasattr(shape, "text")])
     pypandoc.convert_text(slides_text, 'pdf', format='markdown', outputfile=output_path)
+
+#conversor PPTX
+#Extrae el texto de un shape respetando negritas, listas y colores o eso intento xd
 def extract_text_from_shape(shape):
-    """Extrae el texto de un shape y respeta el formato (negritas, listas)."""
     text = ""
     if hasattr(shape, "text_frame"):
         for paragraph in shape.text_frame.paragraphs:
@@ -164,19 +167,29 @@ def extract_text_from_shape(shape):
             text += "\n"
     return text
 
-def extract_image_from_shape(shape, slide_number, output_folder):
-    """Extrae la imagen de un shape si es un placeholder o imagen."""
+def extract_color_from_shape(shape):
+    if hasattr(shape, "text_frame") and shape.text_frame.paragraphs:
+        run = shape.text_frame.paragraphs[0].runs[0]
+        if run.font.color and hasattr(run.font.color, 'rgb') and run.font.color.rgb:
+            return f"#{run.font.color.rgb:06x}"
+    return None  # Si no hay color definido, retornar None
+
+#Extrae la imagen del shape y la devuelve como un flujo en memoria.
+def extract_image_from_shape(shape):
     if shape.shape_type == 13:  # Es una imagen
-        image = shape.image
-        image_filename = f"slide_{slide_number}_image_{shape.shape_id}.png"
-        image_path = os.path.join(output_folder, image_filename)
-        with open(image_path, "wb") as img_file:
-            img_file.write(image.blob)
-        return image_path
+        image_stream = BytesIO(shape.image.blob)
+        return PILImage.open(image_stream)
+    return None
+
+def extract_background_image(slide):
+    background = slide.background
+    if background.fill.type == 6:  # Background con imagen
+        image = background.fill.picture.image
+        image_stream = BytesIO(image.blob)
+        return PILImage.open(image_stream)
     return None
 
 def extract_table_from_shape(shape):
-    """Extrae tablas de los shapes si hay alguna en la diapositiva."""
     if shape.has_table:
         table_data = []
         for row in shape.table.rows:
@@ -194,23 +207,39 @@ def convert_pptx_to_pdf(input_path: str, output_path: str):
     style_normal = styles['Normal']
     style_heading = styles['Heading1']
 
-    output_images_folder = os.path.join(os.path.dirname(output_path), "pptx_images")
-    os.makedirs(output_images_folder, exist_ok=True)
-
     for slide_idx, slide in enumerate(prs.slides):
         elements.append(Paragraph(f"Slide {slide_idx + 1}", style_heading))
-        
+
+        # Añadir imagen de fondo si existe
+        background_image = extract_background_image(slide)
+        if background_image:
+            img_buffer = BytesIO()
+            background_image.save(img_buffer, format='PNG')
+            img_buffer.seek(0)
+            img = Image(img_buffer, width=8*inch, height=6*inch)
+            elements.append(img)
+
         for shape in slide.shapes:
             if hasattr(shape, "text"):
-                # Extraer el texto formateado
+                # Extraer el texto y color
                 text = extract_text_from_shape(shape)
+                text_color = extract_color_from_shape(shape)
                 if text:
-                    elements.append(Paragraph(text, style_normal))
-            
-            # Extraer las imágenes
-            image_path = extract_image_from_shape(shape, slide_idx + 1, output_images_folder)
-            if image_path:
-                img = Image(image_path, width=4*inch, height=3*inch)
+                    style = ParagraphStyle(
+                        'custom_style',
+                        parent=style_normal,
+                        textColor=HexColor(text_color) if text_color else colors.black,
+                        alignment=TA_LEFT
+                    )
+                    elements.append(Paragraph(text, style))
+
+            # Extraer e insertar las imágenes
+            image = extract_image_from_shape(shape)
+            if image:
+                img_buffer = BytesIO()
+                image.save(img_buffer, format='PNG')
+                img_buffer.seek(0)
+                img = Image(img_buffer, width=4*inch, height=3*inch)
                 elements.append(img)
 
             # Extraer tablas
@@ -233,8 +262,8 @@ def convert_pptx_to_pdf(input_path: str, output_path: str):
         elements.append(PageBreak())  # Nueva página para cada diapositiva
 
     pdf.build(elements)
-    print(f"PDF creado exitosamente en {output_path}")
-
+    #print(f"PDF creado exitosamente en {output_path}")
+    
 def convert_txt_to_pdf(input_path: str, output_path: str) -> None:
     with open(input_path, 'r', encoding='utf-8') as f:
         content = f.read()
