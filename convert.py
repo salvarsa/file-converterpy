@@ -263,7 +263,8 @@ def convert_pptx_to_pdf(input_path: str, output_path: str):
 
     pdf.build(elements)
     #print(f"PDF creado exitosamente en {output_path}")
-    
+
+#conversor PPTX    
 def convert_txt_to_pdf(input_path: str, output_path: str) -> None:
     with open(input_path, 'r', encoding='utf-8') as f:
         content = f.read()
