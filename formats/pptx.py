@@ -1,17 +1,57 @@
-from reportlab.lib import colors
+from pptx import Presentation
 from reportlab.lib.pagesizes import letter, landscape
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Image, Spacer
+from reportlab.pdfgen import canvas
 from reportlab.lib.units import inch
+from reportlab.lib.colors import HexColor
+from reportlab.lib import colors
+from io import BytesIO
+from PIL import Image as PILImage
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Image, Spacer
 from reportlab.platypus import PageBreak
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
-from pptx import Presentation
-from io import BytesIO
-from PIL import Image as PILImage
-from reportlab.lib.colors import HexColor
-
 
 #conversor PPTX
+# Extraer y ajustar las propiedades del texto
+def extract_text_properties(paragraph, pdf, left, top, width, height):
+    for run in paragraph.runs:
+        text = run.text
+        
+        # Aplicar negrita, cursiva y subrayado
+        font_name = "Helvetica"
+        if run.font.bold:
+            font_name += "-Bold"
+        if run.font.italic:
+            font_name = "Helvetica-Oblique"
+        
+        # Tamaño de fuente
+        font_size = 12  # Tamaño por defecto
+        if run.font.size:
+            font_size = run.font.size.pt
+        
+        pdf.setFont(font_name, font_size)
+
+        # Color del texto
+        if run.font.color and hasattr(run.font.color, 'rgb') and run.font.color.rgb:
+            color = f"#{run.font.color.rgb:06x}"
+            pdf.setFillColor(HexColor(color))
+        else:
+            pdf.setFillColor(HexColor("#000000"))  # Color por defecto (negro)
+
+        # Alineación del párrafo
+        alignment = paragraph.alignment  # Extraer alineación
+        if alignment == 1:  # Centrado
+            text_width = pdf.stringWidth(text, font_name, font_size)
+            left = (width - text_width) / 2
+        elif alignment == 2:  # Derecha
+            text_width = pdf.stringWidth(text, font_name, font_size)
+            left = width - text_width
+
+        # Dibujar el texto con espaciado vertical
+        pdf.drawString(left, top, text)
+        top -= font_size + 5  # Ajustar el espaciado entre líneas
+
+        
 #Extrae el texto de un shape respetando negritas, listas y colores o eso intento xd
 def extract_text_from_shape(shape):
     text = ""
@@ -25,6 +65,7 @@ def extract_text_from_shape(shape):
             text += "\n"
     return text
 
+
 def extract_color_from_shape(shape):
     if hasattr(shape, "text_frame") and shape.text_frame.paragraphs:
         run = shape.text_frame.paragraphs[0].runs[0]
@@ -32,12 +73,35 @@ def extract_color_from_shape(shape):
             return f"#{run.font.color.rgb:06x}"
     return None  # Si no hay color definido, retornar None
 
-#Extrae la imagen del shape y la devuelve como un flujo en memoria.
-def extract_image_from_shape(shape):
+# Extraer y ajustar imágenes con justificación
+def extract_image_from_shape(shape, pdf, width, height):
     if shape.shape_type == 13:  # Es una imagen
-        image_stream = BytesIO(shape.image.blob)
-        return PILImage.open(image_stream)
-    return None
+        img_stream = BytesIO(shape.image.blob)
+        img = PILImage.open(img_stream)
+        
+        img_width = shape.width / 914400 * inch
+        img_height = shape.height / 914400 * inch
+        left = shape.left / 914400 * inch
+        top = height - (shape.top / 914400 * inch) - img_height
+
+        # Escalar la imagen si es más grande que la página
+        if img_width > width:
+            scale_factor = width / img_width
+            img_width *= scale_factor
+            img_height *= scale_factor
+        
+        if img_height > height:
+            scale_factor = height / img_height
+            img_width *= scale_factor
+            img_height *= scale_factor
+
+        # Justificación de la imagen (centrada)
+        if left + img_width > width:  # Si la imagen se sale de los márgenes, centrarla
+            left = (width - img_width) / 2
+
+        pdf.drawInlineImage(img, left, top, img_width, img_height)
+
+
 
 def extract_background_image(slide):
     background = slide.background
@@ -58,66 +122,30 @@ def extract_table_from_shape(shape):
 
 def convert_pptx_to_pdf(input_path: str, output_path: str):
     prs = Presentation(input_path)
-    pdf = SimpleDocTemplate(output_path, pagesize=landscape(letter))
+    pdf = canvas.Canvas(output_path, pagesize=landscape(letter))
+    width, height = landscape(letter)
 
-    elements = []
-    styles = getSampleStyleSheet()
-    style_normal = styles['Normal']
-    style_heading = styles['Heading1']
+    for slide in prs.slides:
+        # Fondo
+        fill = slide.background.fill
+        if fill.type == 1:  # Color sólido
+            bg_color = f"#{fill.fore_color.rgb:06x}"
+            pdf.setFillColor(HexColor(bg_color))
+            pdf.rect(0, 0, width, height, fill=1)
 
-    for slide_idx, slide in enumerate(prs.slides):
-        elements.append(Paragraph(f"Slide {slide_idx + 1}", style_heading))
-
-        # Añadir imagen de fondo si existe
-        background_image = extract_background_image(slide)
-        if background_image:
-            img_buffer = BytesIO()
-            background_image.save(img_buffer, format='PNG')
-            img_buffer.seek(0)
-            img = Image(img_buffer, width=8*inch, height=6*inch)
-            elements.append(img)
-
+        # Procesar cada forma
         for shape in slide.shapes:
-            if hasattr(shape, "text"):
-                # Extraer el texto y color
-                text = extract_text_from_shape(shape)
-                text_color = extract_color_from_shape(shape)
-                if text:
-                    style = ParagraphStyle(
-                        'custom_style',
-                        parent=style_normal,
-                        textColor=HexColor(text_color) if text_color else colors.black,
-                        alignment=TA_LEFT
-                    )
-                    elements.append(Paragraph(text, style))
+            if shape.has_text_frame:
+                for paragraph in shape.text_frame.paragraphs:
+                    left = shape.left / 914400 * inch
+                    top = height - (shape.top / 914400 * inch) - (shape.height / 914400 * inch)
+                    
+                    # Ajustar texto con justificación y propiedades
+                    extract_text_properties(paragraph, pdf, left, top, width, height)
+            
+            elif shape.shape_type == 13:  # Imagen
+                extract_image_from_shape(shape, pdf, width, height)
 
-            # Extraer e insertar las imágenes
-            image = extract_image_from_shape(shape)
-            if image:
-                img_buffer = BytesIO()
-                image.save(img_buffer, format='PNG')
-                img_buffer.seek(0)
-                img = Image(img_buffer, width=4*inch, height=3*inch)
-                elements.append(img)
+        pdf.showPage()
 
-            # Extraer tablas
-            table_data = extract_table_from_shape(shape)
-            if table_data:
-                table = Table(table_data)
-                table.setStyle(TableStyle([
-                    ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                    ('FONTSIZE', (0, 0), (-1, 0), 12),
-                    ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                    ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-                    ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ]))
-                elements.append(table)
-
-        elements.append(Spacer(1, 12))  # Añadir espacio entre slides
-        elements.append(PageBreak())  # Nueva página para cada diapositiva
-
-    pdf.build(elements)
-    #print(f"PDF creado exitosamente en {output_path}")
+    pdf.save()
