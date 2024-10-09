@@ -75,31 +75,43 @@ def extract_color_from_shape(shape):
 
 # Extraer y ajustar imágenes con justificación
 def extract_image_from_shape(shape, pdf, width, height):
-    if shape.shape_type == 13:  # Es una imagen
-        img_stream = BytesIO(shape.image.blob)
-        img = PILImage.open(img_stream)
+    if shape.shape_type == 13:  # Verifica si es una imagen
+        img_stream = BytesIO(shape.image.blob)  # Extrae los datos binarios de la imagen
+        img = PILImage.open(img_stream)  # Abre la imagen usando Pillow
         
+        # Dimensiones y posición de la imagen en el PowerPoint, convertidas a puntos para el PDF
         img_width = shape.width / 914400 * inch
         img_height = shape.height / 914400 * inch
         left = shape.left / 914400 * inch
         top = height - (shape.top / 914400 * inch) - img_height
-
-        # Escalar la imagen si es más grande que la página
-        if img_width > width:
-            scale_factor = width / img_width
-            img_width *= scale_factor
-            img_height *= scale_factor
         
-        if img_height > height:
-            scale_factor = height / img_height
-            img_width *= scale_factor
-            img_height *= scale_factor
-
-        # Justificación de la imagen (centrada)
-        if left + img_width > width:  # Si la imagen se sale de los márgenes, centrarla
-            left = (width - img_width) / 2
-
-        pdf.drawInlineImage(img, left, top, img_width, img_height)
+        # Calcular el factor de escala para mantener la proporción y ajustar al tamaño de la página
+        scale_factor = min(width / img_width, height / img_height, 1)
+        scaled_width = img_width * scale_factor
+        scaled_height = img_height * scale_factor
+        
+        # Calcular la posición horizontal respetando la alineación original
+        slide_center = width / 2
+        image_center = left + (img_width / 2)
+        
+        if image_center < slide_center:
+            # La imagen está originalmente en la mitad izquierda
+            new_left = left
+        elif image_center > slide_center:
+            # La imagen está originalmente en la mitad derecha
+            new_left = min(left, width - scaled_width)
+        else:
+            # La imagen está centrada originalmente
+            new_left = (width - scaled_width) / 2
+        
+        # Asegurarse de que la imagen no se salga de los márgenes
+        new_left = max(0, min(new_left, width - scaled_width))
+        
+        # Ajustar la posición vertical si es necesario
+        new_top = max(0, min(top, height - scaled_height))
+        
+        # Dibuja la imagen en el PDF con el tamaño y posición calculados
+        pdf.drawInlineImage(img, new_left, new_top, scaled_width, scaled_height)
 
 
 
@@ -122,9 +134,17 @@ def extract_table_from_shape(shape):
 
 def convert_pptx_to_pdf(input_path: str, output_path: str):
     prs = Presentation(input_path)
-    pdf = canvas.Canvas(output_path, pagesize=landscape(letter))
-    width, height = landscape(letter)
-
+    
+    # Obtener el tamaño de la primera diapositiva
+    slide_width = prs.slide_width
+    slide_height = prs.slide_height
+    
+    # Convertir a puntos (1 punto = 1/72 pulgadas)
+    width = slide_width / 914400 * 72
+    height = slide_height / 914400 * 72
+    
+    pdf = canvas.Canvas(output_path, pagesize=(width, height))
+    
     for slide in prs.slides:
         # Fondo
         fill = slide.background.fill
@@ -132,20 +152,18 @@ def convert_pptx_to_pdf(input_path: str, output_path: str):
             bg_color = f"#{fill.fore_color.rgb:06x}"
             pdf.setFillColor(HexColor(bg_color))
             pdf.rect(0, 0, width, height, fill=1)
-
+        
         # Procesar cada forma
         for shape in slide.shapes:
             if shape.has_text_frame:
                 for paragraph in shape.text_frame.paragraphs:
                     left = shape.left / 914400 * inch
                     top = height - (shape.top / 914400 * inch) - (shape.height / 914400 * inch)
-                    
                     # Ajustar texto con justificación y propiedades
                     extract_text_properties(paragraph, pdf, left, top, width, height)
-            
             elif shape.shape_type == 13:  # Imagen
                 extract_image_from_shape(shape, pdf, width, height)
-
+        
         pdf.showPage()
-
+    
     pdf.save()
