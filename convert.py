@@ -1,11 +1,10 @@
 import os
 import sys
 import pypandoc
-from svglib.svglib import svg2rlg
-from reportlab.graphics import renderPDF
 from formats.docx import convert_docx_to_pdf
 from formats.xlxs import convert_xlsx_to_pdf
 from formats.pptx import convert_pptx_to_pdf
+from formats.images import convert_image_to_pdf
 
 
 def download_pdf():
@@ -25,10 +24,6 @@ def convert_txt_to_pdf(input_path: str, output_path: str) -> None:
         content = f.read()
     pypandoc.convert_text(content, 'pdf', format='markdown', outputfile=output_path)
 
-def convert_svg_to_pdf(input_path: str, output_path: str) -> None:
-    drawing = svg2rlg(input_path)
-    renderPDF.drawToFile(drawing, output_path)
-
 def convert_file_to_pdf(input_path: str, output_path: str) -> None:
     try:
         ext = os.path.splitext(input_path)[1].lower()
@@ -45,8 +40,8 @@ def convert_file_to_pdf(input_path: str, output_path: str) -> None:
             convert_pptx_to_pdf(input_path, output_path)
         elif ext == '.txt':
             convert_txt_to_pdf(input_path, output_path)
-        elif ext == '.svg':
-            convert_svg_to_pdf(input_path, output_path)
+        elif ext in ['.svg', '.png', '.jpg', '.jpeg']:
+            convert_image_to_pdf(input_path, output_path)
         else:
             raise ValueError(f"Unsupported file format: {ext}")
         
@@ -56,11 +51,6 @@ def convert_file_to_pdf(input_path: str, output_path: str) -> None:
         error_message = f"Error during conversion: {str(e)}"
         print(error_message)
         raise ValueError(error_message)
-
-# if __name__ == '__main__':
-#     input_file = '/Users/dev13/desktop/Buscador de Dioses.docx'  
-#     output_file = 'sisas.pdf' 
-#     convert_file_to_pdf(input_file, output_file)
     
 if __name__ == '__main__':
     if len(sys.argv) < 2:
