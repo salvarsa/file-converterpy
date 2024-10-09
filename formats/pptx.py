@@ -1,15 +1,9 @@
 from pptx import Presentation
-from reportlab.lib.pagesizes import letter, landscape
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import inch
 from reportlab.lib.colors import HexColor
-from reportlab.lib import colors
 from io import BytesIO
 from PIL import Image as PILImage
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Image, Spacer
-from reportlab.platypus import PageBreak
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.enums import TA_CENTER, TA_LEFT
 
 #conversor PPTX
 # Extraer y ajustar las propiedades del texto
@@ -50,8 +44,7 @@ def extract_text_properties(paragraph, pdf, left, top, width, height):
         # Dibujar el texto con espaciado vertical
         pdf.drawString(left, top, text)
         top -= font_size + 5  # Ajustar el espaciado entre líneas
-
-        
+      
 #Extrae el texto de un shape respetando negritas, listas y colores o eso intento xd
 def extract_text_from_shape(shape):
     text = ""
@@ -64,7 +57,6 @@ def extract_text_from_shape(shape):
                     text += run.text
             text += "\n"
     return text
-
 
 def extract_color_from_shape(shape):
     if hasattr(shape, "text_frame") and shape.text_frame.paragraphs:
@@ -112,8 +104,6 @@ def extract_image_from_shape(shape, pdf, width, height):
         
         # Dibuja la imagen en el PDF con el tamaño y posición calculados
         pdf.drawInlineImage(img, new_left, new_top, scaled_width, scaled_height)
-
-
 
 def extract_background_image(slide):
     background = slide.background

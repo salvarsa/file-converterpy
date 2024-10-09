@@ -6,7 +6,9 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib.units import inch
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
-
+from openpyxl.utils import get_column_letter
+from reportlab.lib.units import cm
+    
 def get_column_widths(sheet, max_width):
     column_widths = []
     for col in sheet.columns:
@@ -47,21 +49,50 @@ def process_cell(cell, centered_style, max_characters=100):
         return Paragraph(cell_value, centered_style)
     return ''
 
+
 def convert_xlsx_to_pdf(input_path: str, output_path: str) -> None:
+    from openpyxl.utils import get_column_letter
+    from reportlab.lib.units import cm
+
     wb = load_workbook(input_path)
     sheet = wb.active
+
+    # Obtener las dimensiones de la hoja de Excel
+    sheet_width = 0
+    for column in sheet.columns:
+        col_letter = get_column_letter(column[0].column)
+        col_width = sheet.column_dimensions[col_letter].width
+        if col_width is None:
+            col_width = 8.43  # Ancho predeterminado en Excel (8.43 caracteres)
+        sheet_width += col_width
     
-    # Configurar márgenes y tamaño de página
-    page_width, page_height = landscape(letter)
-    margins = 0.5 * inch
-    effective_page_width = page_width - 2 * margins
-    effective_page_height = page_height - 2 * margins
-    
+    sheet_height = 0
+    for row in sheet.rows:
+        row_height = sheet.row_dimensions[row[0].row].height
+        if row_height is None:
+            row_height = 15  # Altura predeterminada en Excel (15 puntos)
+        sheet_height += row_height
+
+    # Convertir las dimensiones a puntos (1 punto = 1/72 pulgadas)
+    page_width = sheet_width * 0.35  # Aproximación de unidades de Excel a cm
+    page_height = sheet_height * 0.035  # Aproximación de unidades de Excel a cm
+
+    # Configurar márgenes (en cm)
+    margin_left = 0.2 * cm
+    margin_right = 0.2 * cm
+    margin_top = 0.5 * cm
+    margin_bottom = 0.5 * cm
+
     pdf = SimpleDocTemplate(
-        output_path, pagesize=landscape(letter), 
-        leftMargin=margins, rightMargin=margins, topMargin=margins, bottomMargin=margins
+        output_path,
+        pagesize=(page_width * cm, page_height * cm),
+        leftMargin=margin_left,
+        rightMargin=margin_right,
+        topMargin=margin_top,
+        bottomMargin=margin_bottom
     )
-    
+
+    # El resto de su código permanece igual
     data = []
     styles = getSampleStyleSheet()
     centered_style = ParagraphStyle('centered', parent=styles['Normal'], alignment=TA_CENTER, wordWrap='CJK')
@@ -72,13 +103,13 @@ def convert_xlsx_to_pdf(input_path: str, output_path: str) -> None:
             processed_cell = process_cell(cell, centered_style)
             processed_row.append(processed_cell)
         data.append(processed_row)
-    
+
     # Ajustar anchos de las columnas
-    column_widths = get_column_widths(sheet, effective_page_width)
-    
+    column_widths = get_column_widths(sheet, page_width * cm - (margin_left + margin_right))
+
     # Definir la tabla con los datos procesados
     table = Table(data, colWidths=column_widths, repeatRows=1)
-    
+
     # Estilos de la tabla
     style = TableStyle([
         ('GRID', (0, 0), (-1, -1), 1, colors.black),
@@ -91,18 +122,17 @@ def convert_xlsx_to_pdf(input_path: str, output_path: str) -> None:
         ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
         ('FONTSIZE', (0, 0), (-1, -1), 8),  # Ajuste de tamaño de fuente
     ])
-    
+
     # Combinar celdas
     for merged_range in sheet.merged_cells.ranges:
         min_col, min_row, max_col, max_row = merged_range.bounds
         style.add('SPAN', (min_col - 1, min_row - 1), (max_col - 1, max_row - 1))
-    
+
     table.setStyle(style)
     elements = [table]
-    
+
     # Intentar construir el PDF
     try:
         pdf.build(elements)
-        #print(f'Archivo PDF guardado en: {output_path}')
     except Exception as e:
         raise ValueError(f"Error during conversion: {e}")
