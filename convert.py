@@ -1,10 +1,10 @@
 import os
 import sys
-import pypandoc
 from formats.docx import convert_docx_to_pdf
 from formats.xlxs import convert_xlsx_to_pdf
 from formats.pptx import convert_pptx_to_pdf
 from formats.images import convert_image_to_pdf
+from formats.txt import convert_txt_to_pdf
 
 
 def download_pdf():
@@ -17,12 +17,6 @@ def generate_unique_filename(base_path, base_name, extension):
         new_path = os.path.join(base_path, f"{base_name}_{counter}{extension}")
         counter += 1
     return new_path
-
-#conversor TXT   
-def convert_txt_to_pdf(input_path: str, output_path: str) -> None:
-    with open(input_path, 'r', encoding='utf-8') as f:
-        content = f.read()
-    pypandoc.convert_text(content, 'pdf', format='markdown', outputfile=output_path)
 
 def convert_file_to_pdf(input_path: str, output_path: str) -> None:
     try:
@@ -54,9 +48,7 @@ def convert_file_to_pdf(input_path: str, output_path: str) -> None:
     
 if __name__ == '__main__':
     if len(sys.argv) < 2:
-        print("Uso: python convert.py <input_file>")
         sys.exit(1)
     
     input_file = sys.argv[1]
     convert_file_to_pdf(input_file, "")
-    
