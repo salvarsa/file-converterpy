@@ -4,6 +4,7 @@ from reportlab.lib.units import inch
 from reportlab.lib.colors import HexColor
 from io import BytesIO
 from PIL import Image as PILImage
+from formats.text_fonts import text_fonts
 
 #conversor PPTX
 # Extraer y ajustar las propiedades del texto
@@ -138,7 +139,7 @@ def convert_pptx_to_pdf(input_path: str, output_path: str):
                     left = shape.left / 914400 * inch
                     top = height - (shape.top / 914400 * inch) - (shape.height / 914400 * inch)
 
-                    extract_text_properties(paragraph, pdf, left, top, width, height)
+                    text_fonts(prs, pdf)
             elif shape.shape_type == 13:  # Imagen
                 extract_image_from_shape(shape, pdf, width, height)
         
