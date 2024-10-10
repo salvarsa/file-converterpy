@@ -23,6 +23,6 @@ def convert_image_to_pdf(input_path: str, output_path: str) -> None:
         image = image.convert('RGB')
         image.save(output_path, 'PDF', resolution=100.0)
     else:
-        raise ValueError(f"Formato de archivo de imagen no soportado: {file_extension}")
+        raise ValueError(f"INVALID_FORMAT: {file_extension}")
 
     return output_path
