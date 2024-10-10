@@ -1,6 +1,6 @@
 # File Converter
 
-Este proyecto permite convertir diferentes formatos de archivo a PDF, incluyendo `.docx`, `.xlsx`, `.pptx`, `.txt` y algunos formatos de imagen.
+Este proyecto permite convertir diferentes formatos de archivo a PDF, incluyendo `.docx`, `.xlsx`, `.pptx`, `.txt` y algunos formatos de imagen como `.jpeg`, `.jpg`, `.png`, `.sgv`.
 
 ## Requisitos del sistema
 
@@ -9,10 +9,10 @@ Este proyecto permite convertir diferentes formatos de archivo a PDF, incluyendo
 
 ### Instalación de pre-requisitos
 
-
+```bash
 sudo apt update
 sudo apt install python3-pip python3-venv
-
+```
 
 1. Clonar el repositorio
 
