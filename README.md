@@ -22,11 +22,15 @@ git clone https://github.com/salvarsa/file-converterpy.git
 cd file-converterpy
 ```
 
-2. Crear y activar el entorno virtual
+2. Crear el entorno virtual
 
 
 ```bash
 python3 -m venv venv
+```
+Activar el entorno virtual
+
+```bash
 source venv/bin/activate
 ```
 
