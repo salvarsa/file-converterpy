@@ -43,12 +43,12 @@ def convert_file_to_pdf(input_path: str, output_path: str) -> None:
         elif ext in ['.svg', '.png', '.jpg', '.jpeg']:
             convert_image_to_pdf(input_path, output_path)
         else:
-            raise ValueError(f"Unsupported file format: {ext}")
+            raise ValueError(f"INVALID_FILE_FORMAT: {ext}")
         
         print(f"{output_path}")
         return output_path
     except Exception as e:
-        error_message = f"Error during conversion: {str(e)}"
+        error_message = f"CONVERTION_ERROR: {str(e)}"
         print(error_message)
         raise ValueError(error_message)
     

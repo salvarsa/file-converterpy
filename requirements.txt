@@ -1,0 +1,7 @@
+pypandoc
+pdfkit
+Pillow
+reportlab
+openpyxl
+python-pptx
+svglib

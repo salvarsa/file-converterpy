@@ -30,7 +30,7 @@ def get_row_heights(sheet, max_height=50):
         height = sheet.row_dimensions[row[0].row].height
         if height is None:
             height = 15
-        if height > max_height:  # Limitar altura
+        if height > max_height: 
             height = max_height
         row_heights.append(height)
     return row_heights
@@ -39,25 +39,21 @@ def get_row_heights(sheet, max_height=50):
 def process_cell(cell, centered_style, max_characters=100):
     if cell.data_type == 'i':  # Image
         img = Image(io.BytesIO(cell.value))
-        img.drawHeight = 50  # Ajusta según sea necesario
-        img.drawWidth = 50   # Ajusta según sea necesario
+        img.drawHeight = 50  
+        img.drawWidth = 50 
         return img
     elif cell.value is not None:
         cell_value = str(cell.value)
-        if len(cell_value) > max_characters:  # Limitar longitud del contenido
+        if len(cell_value) > max_characters: 
             cell_value = cell_value[:max_characters] + '...'  # Truncar contenido largo
         return Paragraph(cell_value, centered_style)
     return ''
 
 
 def convert_xlsx_to_pdf(input_path: str, output_path: str) -> None:
-    from openpyxl.utils import get_column_letter
-    from reportlab.lib.units import cm
-
     wb = load_workbook(input_path)
     sheet = wb.active
 
-    # Obtener las dimensiones de la hoja de Excel
     sheet_width = 0
     for column in sheet.columns:
         col_letter = get_column_letter(column[0].column)
@@ -70,14 +66,13 @@ def convert_xlsx_to_pdf(input_path: str, output_path: str) -> None:
     for row in sheet.rows:
         row_height = sheet.row_dimensions[row[0].row].height
         if row_height is None:
-            row_height = 15  # Altura predeterminada en Excel (15 puntos)
+            row_height = 15  
         sheet_height += row_height
 
     # Convertir las dimensiones a puntos (1 punto = 1/72 pulgadas)
     page_width = sheet_width * 0.35  # Aproximación de unidades de Excel a cm
     page_height = sheet_height * 0.035  # Aproximación de unidades de Excel a cm
 
-    # Configurar márgenes (en cm)
     margin_left = 0.2 * cm
     margin_right = 0.2 * cm
     margin_top = 0.5 * cm
@@ -92,7 +87,6 @@ def convert_xlsx_to_pdf(input_path: str, output_path: str) -> None:
         bottomMargin=margin_bottom
     )
 
-    # El resto de su código permanece igual
     data = []
     styles = getSampleStyleSheet()
     centered_style = ParagraphStyle('centered', parent=styles['Normal'], alignment=TA_CENTER, wordWrap='CJK')
@@ -104,10 +98,8 @@ def convert_xlsx_to_pdf(input_path: str, output_path: str) -> None:
             processed_row.append(processed_cell)
         data.append(processed_row)
 
-    # Ajustar anchos de las columnas
     column_widths = get_column_widths(sheet, page_width * cm - (margin_left + margin_right))
 
-    # Definir la tabla con los datos procesados
     table = Table(data, colWidths=column_widths, repeatRows=1)
 
     # Estilos de la tabla
@@ -120,7 +112,7 @@ def convert_xlsx_to_pdf(input_path: str, output_path: str) -> None:
         ('TOPPADDING', (0, 0), (-1, -1), 3),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
         ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-        ('FONTSIZE', (0, 0), (-1, -1), 8),  # Ajuste de tamaño de fuente
+        ('FONTSIZE', (0, 0), (-1, -1), 8),
     ])
 
     # Combinar celdas
@@ -131,8 +123,7 @@ def convert_xlsx_to_pdf(input_path: str, output_path: str) -> None:
     table.setStyle(style)
     elements = [table]
 
-    # Intentar construir el PDF
     try:
         pdf.build(elements)
     except Exception as e:
-        raise ValueError(f"Error during conversion: {e}")
+        raise ValueError(f"CONVERTION_ERROR: {e}")
