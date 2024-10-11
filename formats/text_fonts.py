@@ -1,79 +1,81 @@
-from pptx import Presentation
 import xml.etree.ElementTree as ET
 from reportlab.lib.colors import HexColor
+from reportlab.lib.units import inch
 
-def text_fonts(presentation, pdf):
-    for slide_number, slide in enumerate(presentation.slides, start=1):
-  
-        # Suponiendo que tienes el XML en una cadena
-        root = ET.fromstring(slide.background.element.xml)
-        nsmap = slide.part.slide.element.nsmap
-
-        # Extraer texto
-        text_elements = root.findall('.//a:t', nsmap)
-        text_content = '<br>'.join([elem.text for elem in text_elements if elem.text])
+def extract_text_properties(shape,xml,nsmap):
+    if not hasattr(shape, 'text_frame'):
+        return None
+    #print(f'\n\n====XML====D{xml}\n\n')
+    properties = []
     
-        #Extraer tamaño
-        size = 12
-        text_size = root.find('.//a:r/a:rPr', nsmap)
-        if text_size is not None:
-            sz = text_size.get('sz')
-            if sz is not None:
-                size = f'{(int(sz) / 100):.0f}'
+    # Parse XML to get detailed text properties
+    root = ET.fromstring(shape.element.xml)
+    #print(f'\n====size===={shape.element.xml}\n')
+    nsmap = {'a': 'http://schemas.openxmlformats.org/drawingml/2006/main',
+             'p': 'http://schemas.openxmlformats.org/presentationml/2006/main'}
 
-        #Extraer cordenadas del texto
-        text_position = root.find('.//p:sp[1]/p:spPr/a:xfrm/a:off', nsmap)
-        if text_position is not None:
-            text_x = text_position.get('x')
-            text_y = text_position.get('y')
+    for paragraph in shape.text_frame.paragraphs:
+        p_xml = root.find('.//a:p', nsmap)
+        if p_xml is None:
+            continue
 
-        # Buscar la etiqueta <a:buFont> typo de fuente del texto
-        text_font_type = root.find('.//a:buFont', nsmap)
-        if text_font_type is not None:
-            font_type = text_font_type.get('typeface')
+        # Get paragraph alignment
+        align = p_xml.find('.//a:pPr', nsmap)
+        alignment = 0  # Default left alignment
+        if align is not None:
+            algn_value = align.get('algn', '0')
+            if algn_value == 'ctr':
+                alignment = 1  # Center
+            elif algn_value == 'r':
+                alignment = 2  # Right
+            else:
+                try:
+                    alignment = int(algn_value)
+                except ValueError:
+                    alignment = 0  # Default to left if unknown value
 
-        text_line_spacing = root.find('.//a:spcPct', nsmap)
-        if text_line_spacing is not None:
-            line_spacing_percentage = text_line_spacing.get('val')
+        for run in paragraph.runs:
+            r_xml = p_xml.find('.//a:r', nsmap)
+            if r_xml is None:
+                continue
 
-        # Extraer márgenes de <a:bodyPr>
-        body_pr = root.find('.//a:bodyPr', nsmap)
-        if body_pr is not None:
-            lIns = int(body_pr.get('lIns', 0))
-            rIns = int(body_pr.get('rIns', 0))
-            tIns = int(body_pr.get('tIns', 0))
-            bIns = int(body_pr.get('bIns', 0))
+            # Get font properties
+            font_props = r_xml.find('.//a:rPr', nsmap)
+            if font_props is None:
+                continue
 
-        p_pr = root.find('.//a:pPr', nsmap)
-        # if p_pr is not None:
-        #     spcBef = int(p_pr.find('.//a:spcBef', nsmap).get('val', 0))
-        #     spcAft = int(p_pr.find('.//a:spcAft', nsmap).get('val', 0))    
+            # Font name
+            typeface = font_props.find('.//a:rPr', nsmap)
+            font_name = typeface.get('typeface', 'Helvetica') if typeface is not None else 'Helvetica'
 
-        lIns_points = lIns / 1000
-        rIns_points = rIns / 1000
-        tIns_points = tIns / 1000
-        bIns_points = bIns / 1000
-        # spcBef_points = spcBef / 1000
-        # spcAft_points = spcAft / 1000
-        
-        pdf.setFont('Helvetica', size)
-        pdf.setFillColor(HexColor("#000000"))
-        
-        pdf.drawString(lIns_points, tIns_points, text_content)
-   
-    
-        # elements = {
-        # 'text': text_content,
-        # 'size': size,
-        # 'text_x': text_x,  # Ajusta la posición en la página
-        # 'text_y': text_x,
-        # 'text_font_type': font_type,  # Asegúrate de que la fuente esté disponible
-        # 'line_percentage': line_spacing_percentage,
-        # 'lIns': lIns_points,
-        # 'rIns': rIns_points,
-        # 'tIns': tIns_points,
-        # 'bIns': bIns_points,
-        # # 'spcBef': spcBef_points,
-        # # 'spcAft': spcAft_points,
-        # }
-        
+            # Font size
+            size = font_props.get('sz')
+            
+            font_size = int(size) / 100 if size is not None else 12
+
+            # Font style
+            bold = font_props.get('b') == '1'
+            italic = font_props.get('i') == '1'
+
+            # Font color
+            color = font_props.find('.//a:solidFill/a:srgbClr', nsmap)
+            text_color = f"#{color.get('val', '000000')}" if color is not None else "#000000"
+
+            properties.append({
+                'text': run.text,
+                'font_name': font_name,
+                'font_size': font_size,
+                'bold': bold,
+                'italic': italic,
+                'color': text_color,
+                'alignment': alignment
+            })
+
+    return properties
+
+def get_shape_position(shape, slide_height):
+    left = shape.left / 914400 * inch
+    top = slide_height - (shape.top / 914400 * inch)
+    width = shape.width / 914400 * inch
+    height = shape.height / 914400 * inch
+    return left, top, width, height
