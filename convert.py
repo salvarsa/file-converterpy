@@ -49,6 +49,7 @@ def convert_file_to_pdf(input_path: str, output_path: str) -> None:
 if __name__ == '__main__':
     if len(sys.argv) < 2:
         sys.exit(1)
-    
+   
     input_file = sys.argv[1]
-    convert_file_to_pdf(input_file, "")
+    output_path = convert_file_to_pdf(input_file, "")
+    
