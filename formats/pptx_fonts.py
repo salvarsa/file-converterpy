@@ -5,10 +5,9 @@ from reportlab.lib.units import inch
 def extract_text_properties(shape,xml,nsmap):
     if not hasattr(shape, 'text_frame'):
         return None
-    #print(f'\n\n====XML====D{xml}\n\n')
     properties = []
     
-    # Parse XML to get detailed text properties
+    # Parse XML para obtener detalles de la fuente
     root = ET.fromstring(shape.element.xml)
     #print(f'\n====size===={shape.element.xml}\n')
     nsmap = {'a': 'http://schemas.openxmlformats.org/drawingml/2006/main',
@@ -19,9 +18,8 @@ def extract_text_properties(shape,xml,nsmap):
         if p_xml is None:
             continue
 
-        # Get paragraph alignment
         align = p_xml.find('.//a:pPr', nsmap)
-        alignment = 0  # Default left alignment
+        alignment = 0 
         if align is not None:
             algn_value = align.get('algn', '0')
             if algn_value == 'ctr':
@@ -32,7 +30,7 @@ def extract_text_properties(shape,xml,nsmap):
                 try:
                     alignment = int(algn_value)
                 except ValueError:
-                    alignment = 0  # Default to left if unknown value
+                    alignment = 0
 
         for run in paragraph.runs:
             r_xml = p_xml.find('.//a:r', nsmap)

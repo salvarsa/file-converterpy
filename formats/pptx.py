@@ -3,16 +3,15 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.colors import HexColor
 from io import BytesIO
 from PIL import Image as PILImage
-from formats.text_fonts import extract_text_properties, get_shape_position
+from formats.pptx_fonts import extract_text_properties, get_shape_position
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.platypus import Paragraph
 from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT, TA_JUSTIFY
 from reportlab.lib.colors import black
 from reportlab.lib.units import inch
 
-# Extraer y ajustar imágenes con justificación
 def extract_image_from_shape(shape, pdf, slide_height):
-    if shape.shape_type == 13:  # Picture
+    if shape.shape_type == 13: 
         img_stream = BytesIO(shape.image.blob)
         img = PILImage.open(img_stream)
         left, top, width, height = get_shape_position(shape, slide_height)
@@ -36,14 +35,12 @@ def extract_table_from_shape(shape):
     return None
 
 def draw_text_with_properties(pdf, text_props, left, top, width, height):
-    # Calculate total text height
     total_height = sum(prop.get('font_size', 12) * 1.2 for prop in text_props)
     
     # Start from the top of the text box
     current_y = top
     
-    # Adjust starting position based on vertical alignment
-    vertical_alignment = text_props[0].get('vertical_alignment', 0)  # Assume all props have same vertical alignment
+    vertical_alignment = text_props[0].get('vertical_alignment', 0)
     if vertical_alignment == 1:  # Middle
         current_y = top - (height - total_height) / 2
     elif vertical_alignment == 2:  # Bottom
@@ -98,14 +95,12 @@ def convert_pptx_to_pdf(input_path: str, output_path: str):
     pdf = canvas.Canvas(output_path, pagesize=(slide_width, slide_height))
     
     for slide in prs.slides:
-        # Set slide background
         fill = slide.background.fill
         if fill.type == 1:  # Solid fill
             bg_color = f"#{fill.fore_color.rgb:06x}"
             pdf.setFillColor(HexColor(bg_color))
             pdf.rect(0, 0, slide_width, slide_height, fill=1)
-        
-        # Process shapes
+
         for shape in slide.shapes:
             if shape.has_text_frame:
                 text_props = extract_text_properties(shape, slide.element.xml, slide.part.slide.element.nsmap)
