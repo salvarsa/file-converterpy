@@ -10,6 +10,7 @@ from openpyxl.utils import get_column_letter
 from reportlab.lib.units import cm
     
 def get_column_widths(sheet, max_width):
+    
     column_widths = []
     for col in sheet.columns:
         width = sheet.column_dimensions[col[0].column_letter].width
@@ -33,6 +34,7 @@ def get_row_heights(sheet, max_height=50):
         if height > max_height: 
             height = max_height
         row_heights.append(height)
+        
     return row_heights
 
 # Función para procesar celdas y ajustarlas a tamaños de hoja
@@ -102,7 +104,6 @@ def convert_xlsx_to_pdf(input_path: str, output_path: str) -> None:
 
     table = Table(data, colWidths=column_widths, repeatRows=1)
 
-    # Estilos de la tabla
     style = TableStyle([
         ('GRID', (0, 0), (-1, -1), 1, colors.black),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
